@@ -1,0 +1,23 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@500;600;700&display=swap');
+
+:root {
+  --bg: #070b12;
+  --fg: #dbe6ff;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  @apply bg-[#070b12] text-white antialiased;
+  background-image: radial-gradient(1000px 600px at -10% -10%, rgba(43,135,255,.15), transparent), radial-gradient(800px 300px at 110% 10%, rgba(255,255,255,.06), transparent);
+}
+
+a { @apply text-brand-300 hover:text-brand-200; }
+
+.container {
+  @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+}
+
+.card {
+  @apply rounded-2xl bg-white/5 border border-white/10 backdrop-blur-lg shadow-glow;
+}
