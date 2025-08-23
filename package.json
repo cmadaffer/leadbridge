@@ -1,10 +1,10 @@
 {
   "name": "leadbridge",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "scripts": {
     "dev": "next dev",
-    "build": "next build && next export",
+    "build": "next build",
     "start": "next start",
     "lint": "echo \"(lint skipped)\""
   },
