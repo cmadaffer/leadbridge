@@ -1,42 +1,41 @@
 import { supabaseServer } from "@/lib/supabase-server";
-import { twilioClient } from "@/lib/twilio";
 import { normalizePhone } from "@/lib/phone";
+import { sendSMS } from "@/lib/twilio-rest";
 
 export async function POST(req) {
-  // Twilio sends x-www-form-urlencoded
+  // Twilio posts x-www-form-urlencoded
   const text = await req.text();
   const params = Object.fromEntries(new URLSearchParams(text).entries());
-  const from = normalizePhone(params.From);
-  const to = normalizePhone(params.To);
+  const fromPhone = normalizePhone(params.From);
+  const toPhone = normalizePhone(params.To);
   const body = (params.Body || "").toString().trim();
 
-  if (!from || !body) return new Response("OK", { status: 200 });
+  if (!fromPhone || !body) return new Response("OK", { status: 200 });
 
   const sb = supabaseServer();
 
   // Upsert contact
-  let { data: c } = await sb.from("contacts").select("*").eq("phone", from).single();
+  let { data: c } = await sb.from("contacts").select("*").eq("phone", fromPhone).single();
   if (!c) {
-    const ins = await sb.from("contacts").insert({ phone: from, last_message: body, last_at: new Date().toISOString() }).select("*").single();
+    const ins = await sb.from("contacts")
+      .insert({ phone: fromPhone, last_message: body, last_at: new Date().toISOString() })
+      .select("*").single();
     c = ins.data;
   } else {
-    await sb.from("contacts").update({ last_message: body, last_at: new Date().toISOString() }).eq("id", c.id);
+    await sb.from("contacts")
+      .update({ last_message: body, last_at: new Date().toISOString() })
+      .eq("id", c.id);
   }
 
   // Save inbound message
   await sb.from("messages").insert({ contact_id: c.id, direction: "in", body });
 
-  // Optional AI auto-reply
+  // Optional auto-reply
   if (process.env.AUTO_REPLY === "true") {
     const reply = await generateReply(body);
     if (reply) {
       try {
-        await twilioClient().messages.create({
-          to: from,
-          from: process.env.TWILIO_PHONE_E164,
-          body: reply
-        });
-        // Save outbound message
+        await sendSMS({ to: fromPhone, from: process.env.TWILIO_PHONE_E164, body: reply });
         await sb.from("messages").insert({ contact_id: c.id, direction: "out", body: reply, status: "queued" });
         await sb.from("contacts").update({ last_message: reply, last_at: new Date().toISOString() }).eq("id", c.id);
       } catch (e) {
@@ -45,7 +44,6 @@ export async function POST(req) {
     }
   }
 
-  // Twilio expects 200 quickly (no TwiML needed)
   return new Response("OK", { status: 200 });
 }
 
