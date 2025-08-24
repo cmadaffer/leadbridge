@@ -1,12 +1,10 @@
-export const dynamic = 'force-dynamic';
+"use client";
 
 import Navbar from "@/components/Navbar";
 import PricingTable from "@/components/PricingTable";
 import FAQ from "@/components/FAQ";
 import CTA from "@/components/CTA";
 import Footer from "@/components/Footer";
-
-export const metadata = { title: "Pricing – LeadBridge" };
 
 export default function PricingPage() {
   return (
@@ -25,3 +23,4 @@ export default function PricingPage() {
     </>
   );
 }
+
