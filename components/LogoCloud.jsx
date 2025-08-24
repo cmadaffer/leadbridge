@@ -1,3 +1,5 @@
+"use client";
+
 export default function LogoCloud() {
   const logos = ["Home", "Dental", "Auto", "MedSpa", "Legal", "Realty"];
   return (
