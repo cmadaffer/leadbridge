@@ -1,6 +1,8 @@
+import "./globals.css";
+
 export const metadata = {
   title: "LeadBridge – Turn Google clicks into booked conversations",
-  description: "Bring back instant customer messaging with an AI receptionist that texts, answers, and books jobs 24/7.",
+  description: "Bring back instant customer messaging with an AI receptionist that texts, answers, and books 24/7.",
   icons: { icon: "/favicon.ico" },
   openGraph: {
     title: "LeadBridge",
