@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import Navbar from "@/components/Navbar";
 import PricingTable from "@/components/PricingTable";
 import FAQ from "@/components/FAQ";
