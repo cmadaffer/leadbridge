@@ -3,8 +3,6 @@ import { useState } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
-export const metadata = { title: "Live Demo – LeadBridge" };
-
 export default function DemoPage() {
   const [messages, setMessages] = useState([
     { role: "system", content: "You’re texting WildOak Plumbing. Ask anything!" }
