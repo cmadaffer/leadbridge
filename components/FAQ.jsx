@@ -1,3 +1,5 @@
+"use client";
+
 export default function FAQ() {
   const faqs = [
     ["Do I need a new phone number?", "We provision a dedicated texting number for your location. You keep your main voice number."],
@@ -8,7 +10,7 @@ export default function FAQ() {
   return (
     <section className="mt-16">
       <div className="container grid md:grid-cols-2 gap-6">
-        {faqs.map(([q,a]) => (
+        {faqs.map(([q, a]) => (
           <div key={q} className="card p-6">
             <h4 className="font-display text-lg">{q}</h4>
             <p className="mt-2 text-white/70">{a}</p>
