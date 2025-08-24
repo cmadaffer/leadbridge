@@ -3,8 +3,6 @@ import { useState } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
-export const metadata = { title: "Get Started – LeadBridge" };
-
 export default function ContactPage() {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
