@@ -21,14 +21,21 @@ export async function POST(req) {
       c = ins.data;
     }
 
-    const tw = await sendSMS({ to, from, body });
+    if (c.opt_out) return new Response("Contact is opted out", { status: 403 });
 
+    // If TF not approved, queue and exit
+    if (process.env.TF_APPROVED !== "true") {
+      await sb.from("messages").insert({
+        contact_id: c.id, direction: "out", body, status: "pending_due_verification", pending: true
+      });
+      return new Response(JSON.stringify({ queued: true }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+
+    const tw = await sendSMS({ to, from, body });
     await sb.from("messages").insert({
-      contact_id: c.id, direction: "out", body, status: tw.status || "queued"
+      contact_id: c.id, direction: "out", body, status: tw.status || "queued", pending: false
     });
-    await sb.from("contacts").update({
-      last_message: body, last_at: new Date().toISOString()
-    }).eq("id", c.id);
+    await sb.from("contacts").update({ last_message: body, last_at: new Date().toISOString() }).eq("id", c.id);
 
     return new Response(JSON.stringify({ ok: true }), {
       status: 200, headers: { "Content-Type": "application/json" }
