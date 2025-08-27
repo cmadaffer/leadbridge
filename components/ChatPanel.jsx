@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 
-export default function ChatPanel({ contact, onSent }) {
+export default function ChatPanel({ contact, onSent, tfApproved }) {
   const [msgs, setMsgs] = useState([]);
   const [text, setText] = useState("");
+  const [queued, setQueued] = useState(false);
 
   async function load() {
     if (!contact) return;
@@ -24,6 +25,8 @@ export default function ChatPanel({ contact, onSent }) {
     if (!text.trim() || !contact) return;
     const r = await fetch("/api/twilio/send", { method: "POST", body: JSON.stringify({ phone: contact.phone, body: text }) });
     if (r.ok) {
+      const j = await r.json();
+      setQueued(Boolean(j.queued));
       setText("");
       await load();
       onSent?.();
@@ -34,10 +37,13 @@ export default function ChatPanel({ contact, onSent }) {
     return <section className="card p-6 h-[70vh] flex items-center justify-center text-white/60">Select a conversation</section>;
   }
 
+  const smsHref = `sms:${contact.phone}${text ? `&body=${encodeURIComponent(text)}` : ""}`;
+
   return (
     <section className="card p-4 h-[70vh] flex flex-col">
       <div className="p-2 border-b border-white/10">
         <h2 className="font-display text-xl">{contact.name || contact.phone}</h2>
+        {!tfApproved && <div className="text-xs text-white/60 mt-1">Replies will be <span className="text-yellow-300">queued</span> until approval.</div>}
       </div>
 
       <div className="flex-1 overflow-y-auto space-y-3 p-3">
@@ -45,7 +51,9 @@ export default function ChatPanel({ contact, onSent }) {
           <div key={m.id} className={`max-w-[80%] ${m.direction==='in' ? "" : "ml-auto text-right"}`}>
             <div className={`inline-block px-3 py-2 rounded-2xl ${m.direction==='in' ? "bg-white/10" : "bg-white text-black"}`}>
               <div className="text-sm">{m.body}</div>
-              <div className="text-[10px] mt-1 opacity-60">{new Date(m.created_at).toLocaleString()}</div>
+              <div className="text-[10px] mt-1 opacity-60">
+                {new Date(m.created_at).toLocaleString()} {m.status && m.direction==='out' ? ` · ${m.status}` : ""}
+              </div>
             </div>
           </div>
         ))}
@@ -61,7 +69,11 @@ export default function ChatPanel({ contact, onSent }) {
           className="flex-1 rounded-full bg-white/10 border border-white/10 px-4 py-3 outline-none"
         />
         <button onClick={send} className="rounded-full px-6 py-3 bg-brand-500 hover:bg-brand-400">Send</button>
+        <a href={smsHref} className="rounded-full px-4 py-3 border border-white/20 hover:bg-white/5" title="Send from your phone">
+          Text from phone
+        </a>
       </div>
+      {queued && <div className="text-xs text-yellow-300 mt-2">Queued for sending when approval is granted.</div>}
     </section>
   );
 }
