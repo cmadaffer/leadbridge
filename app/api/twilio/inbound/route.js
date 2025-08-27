@@ -1,20 +1,19 @@
 import { supabaseServer } from "@/lib/supabase-server";
 import { normalizePhone } from "@/lib/phone";
 import { sendSMS } from "@/lib/twilio-rest";
+import { notifySlack } from "@/lib/notify";
 
 export async function POST(req) {
-  // Twilio posts x-www-form-urlencoded
   const text = await req.text();
   const params = Object.fromEntries(new URLSearchParams(text).entries());
   const fromPhone = normalizePhone(params.From);
-  const toPhone = normalizePhone(params.To);
   const body = (params.Body || "").toString().trim();
 
   if (!fromPhone || !body) return new Response("OK", { status: 200 });
 
   const sb = supabaseServer();
 
-  // Upsert contact
+  // Upsert / update contact
   let { data: c } = await sb.from("contacts").select("*").eq("phone", fromPhone).single();
   if (!c) {
     const ins = await sb.from("contacts")
@@ -27,15 +26,57 @@ export async function POST(req) {
       .eq("id", c.id);
   }
 
-  // Save inbound message
+  // Save inbound
   await sb.from("messages").insert({ contact_id: c.id, direction: "in", body });
 
-  // Optional auto-reply
-  if (process.env.AUTO_REPLY === "true") {
+  // Slack notify (optional)
+  await notifySlack(`📩 New inbound text from ${c.phone}: ${body.slice(0, 300)}`);
+
+  // Compliance: STOP/HELP handling
+  const low = body.trim().toLowerCase();
+  const isStop = ["stop","unsubscribe","cancel","end","quit"].includes(low);
+  const isHelp = low === "help";
+
+  if (isStop) {
+    await sb.from("contacts").update({ opt_out: true }).eq("id", c.id);
+    // Best practice is to send a confirmation, but TF may be blocked.
+    if (process.env.TF_APPROVED === "true") {
+      try {
+        await sendSMS({ to: c.phone, from: process.env.TWILIO_PHONE_E164, body: "You’re opted out and won’t receive more texts. Reply START to opt back in." });
+        await sb.from("messages").insert({ contact_id: c.id, direction: "out", body: "Opt-out confirmation", status: "queued" });
+      } catch {}
+    } else {
+      // queue the confirmation for later (optional)
+      await sb.from("messages").insert({
+        contact_id: c.id, direction: "out", body: "You’re opted out and won’t receive more texts. Reply START to opt back in.",
+        status: "pending_due_verification", pending: true
+      });
+    }
+    return new Response("OK", { status: 200 });
+  }
+
+  if (isHelp && process.env.TF_APPROVED === "true") {
+    try {
+      await sendSMS({
+        to: c.phone, from: process.env.TWILIO_PHONE_E164,
+        body: "Help: This is LeadBridge messaging. Reply STOP to opt out. Support: support@yourdomain.com"
+      });
+      await sb.from("messages").insert({ contact_id: c.id, direction: "out", body: "HELP response", status: "queued" });
+    } catch {}
+  } else if (isHelp) {
+    await sb.from("messages").insert({
+      contact_id: c.id, direction: "out",
+      body: "Help: This is LeadBridge messaging. Reply STOP to opt out. Support: support@yourdomain.com",
+      status: "pending_due_verification", pending: true
+    });
+  }
+
+  // Optional AI auto-reply ONLY if TF approved and not opted out
+  if (process.env.AUTO_REPLY === "true" && process.env.TF_APPROVED === "true" && !c.opt_out) {
     const reply = await generateReply(body);
     if (reply) {
       try {
-        await sendSMS({ to: fromPhone, from: process.env.TWILIO_PHONE_E164, body: reply });
+        await sendSMS({ to: c.phone, from: process.env.TWILIO_PHONE_E164, body: reply });
         await sb.from("messages").insert({ contact_id: c.id, direction: "out", body: reply, status: "queued" });
         await sb.from("contacts").update({ last_message: reply, last_at: new Date().toISOString() }).eq("id", c.id);
       } catch (e) {
@@ -61,7 +102,7 @@ async function generateReply(userMsg) {
     body: JSON.stringify({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: "You are an AI receptionist for a local business. Be concise, friendly, and action-oriented. Offer to book with a link if appropriate." },
+        { role: "system", content: "You are an AI receptionist for a local business. Be concise and action-oriented." },
         { role: "user", content: userMsg }
       ],
       temperature: 0.3
